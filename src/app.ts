@@ -4,9 +4,9 @@ import authRouter from "./routes/auth.routes";
 const app = express();
 app.use(express.json());
 
-app.use("/auth", authRouter);
+app.use("/api/v1/auth", authRouter);
 
-app.get("/healthcheck", (_, res) => {
+app.get("/api/v1/healthcheck", (_, res) => {
   res.status(200).json({
     message: "server is up and running!",
   });

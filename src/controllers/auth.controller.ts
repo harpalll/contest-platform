@@ -1,8 +1,9 @@
 import { sql } from "../db";
 import { asyncHandler } from "../utils/asyncHandler";
+import * as z from "zod";
 
 export const signUp = asyncHandler(async (req, res) => {
-    const { name, email, password, role } = req.body;
+  const { name, email, password, role } = req.body;
 
   const result = await sql`SELECT version()`;
 
