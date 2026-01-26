@@ -15,9 +15,11 @@ export function validateData(schema: z.ZodObject<any, any>) {
           message: `${issue.path.join(".")} is ${issue.message}`,
         }));
 
+        console.log(errorMessages);
+
         res
           .status(StatusCodes.BAD_REQUEST)
-          .json(new ApiResponse(false, errorMessages, "Invalid data"));
+          .json(new ApiResponse(false, null, "INVALID_REQUEST"));
       } else {
         res
           .status(StatusCodes.INTERNAL_SERVER_ERROR)

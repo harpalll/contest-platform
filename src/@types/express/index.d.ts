@@ -1,9 +1,10 @@
 import { Request } from "express";
+type UserRole = "creator" | "contestee";
 
 interface User {
   id: number;
   name: string;
-  role: string;
+  role: UserRole;
 }
 
 declare global {

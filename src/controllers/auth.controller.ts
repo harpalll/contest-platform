@@ -73,7 +73,9 @@ export const login = asyncHandler(async (req, res) => {
   );
 
   if (!isPasswordCorrect) {
-    return res.status(401).json(new ApiResponse(false, {}, "INVALID_PASSWORD"));
+    return res
+      .status(401)
+      .json(new ApiResponse(false, {}, "INVALID_CREDENTIALS"));
   }
 
   const payload = {

@@ -1,12 +1,15 @@
 import express from "express";
-import authRouter from "./routes/auth.routes";
+
+// * ROUTES
+import { authRouter, contestRouter } from "./routes/index";
 
 const app = express();
 app.use(express.json());
 
-app.use("/api/v1/auth", authRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/contests", contestRouter);
 
-app.get("/api/v1/healthcheck", (_, res) => {
+app.get("/api/healthcheck", (_, res) => {
   res.status(200).json({
     message: "server is up and running!",
   });
