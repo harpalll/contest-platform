@@ -5,11 +5,13 @@ import { allowedRoles } from "../middleware/role.middleware";
 import {
   createContestSchema,
   createMcqSchema,
+  submitMcqSchema,
 } from "../schemas/contest.schema";
 import {
   addMcqToContest,
   createContest,
   getContest,
+  submitMcqAnswer,
 } from "../controllers/contest.controller";
 
 const router = Router();
@@ -35,6 +37,8 @@ router.post(
   "/:contestId/mcq/:questionId/submit",
   authMiddleware,
   allowedRoles(["contestee"]),
+  validateData(submitMcqSchema),
+  submitMcqAnswer,
 );
 
 export default router;

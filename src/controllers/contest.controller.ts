@@ -147,3 +147,81 @@ export const addMcqToContest = asyncHandler(async (req, res, next) => {
   );
 });
 
+export const submitMcqAnswer = asyncHandler(async (req, res) => {
+  const { contestId, questionId } = req.params;
+  const { selectedOptionIndex } = req.body;
+  console.log(
+    "contestId",
+    contestId,
+    "questionId",
+    questionId,
+    "selected",
+    selectedOptionIndex,
+  );
+
+  const contest = await sql`
+    SELECT * FROM contests WHERE id=${contestId};
+  `;
+
+  if (!contest.length || contest.length === 0 || !contest[0]) {
+    return res
+      .status(404)
+      .json(new ApiResponse(false, null, "CONTEST_NOT_FOUND"));
+  }
+
+  console.log("contest fetched", contest);
+
+  const question = await sql`
+    SELECT * FROM mcq_questions WHERE id=${questionId};
+  `;
+
+  if (!question.length || question.length === 0 || !question[0]) {
+    return res
+      .status(404)
+      .json(new ApiResponse(false, null, "QUESTION_NOT_FOUND"));
+  }
+  console.log("question fetched", question);
+
+  const submittingTime = new Date();
+  const contestEndTime = new Date(contest[0].end_time);
+
+  if (submittingTime > contestEndTime) {
+    return res
+      .status(400)
+      .json(new ApiResponse(false, null, "CONTEST_NOT_ACTIVE"));
+  }
+
+  const alreadySubmitted = await sql`
+    SELECT * FROM mcq_submissions WHERE question_id=${questionId} and user_id=${req.user?.id};
+  `;
+
+  if (alreadySubmitted.length || alreadySubmitted[0]) {
+    return res
+      .status(404)
+      .json(new ApiResponse(false, null, "ALREADY_SUBMITTED"));
+  }
+
+  const isCorrect = question[0].correct_option_index === selectedOptionIndex;
+  const pointsEarned = isCorrect ? question[0].points : 0;
+  console.log("isCorrect", isCorrect, "pointsEarned", pointsEarned);
+
+  const result = await sql`
+    INSERT INTO mcq_submissions 
+    (user_id, question_id, selected_option_index, is_correct, points_earned)
+    VALUES
+    (${req.user?.id}, ${questionId}, ${selectedOptionIndex}, ${isCorrect}, ${pointsEarned})
+    RETURNING *
+  `;
+
+  const mcqSubmission = result[0];
+  if (!mcqSubmission) {
+    return res
+      .status(StatusCodes.INTERNAL_SERVER_ERROR)
+      .json(new ApiResponse(false, null, "SERVER_ERROR"));
+  }
+  console.log("mcqSubmission", mcqSubmission);
+
+  return res
+    .status(StatusCodes.CREATED)
+    .json(new ApiResponse(true, { isCorrect, pointsEarned }, null));
+});

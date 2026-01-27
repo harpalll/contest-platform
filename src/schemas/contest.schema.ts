@@ -22,5 +22,5 @@ export const createMcqSchema = z.object({
 });
 
 export const submitMcqSchema = z.object({
-  selectedOptionIndex:  z.number({ error: "please enter correctOptionIndex" }),
-})
+  selectedOptionIndex: z.number({ error: "please enter correctOptionIndex" }),
+});
