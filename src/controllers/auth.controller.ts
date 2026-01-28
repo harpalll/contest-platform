@@ -61,10 +61,8 @@ export const login = asyncHandler(async (req, res) => {
   if (user.length > 0 && !user[0]) {
     return res
       .status(401)
-      .json(new ApiResponse(false, {}, "INVALID_CREDENTIALS"));
+      .json(new ApiResponse(false, null, "INVALID_CREDENTIALS"));
   }
-
-  console.log("hash" + user[0]?.password);
 
   const isPasswordCorrect = await Bun.password.verifySync(
     password,
@@ -75,7 +73,7 @@ export const login = asyncHandler(async (req, res) => {
   if (!isPasswordCorrect) {
     return res
       .status(401)
-      .json(new ApiResponse(false, {}, "INVALID_CREDENTIALS"));
+      .json(new ApiResponse(false, null, "INVALID_CREDENTIALS"));
   }
 
   const payload = {

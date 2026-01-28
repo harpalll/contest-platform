@@ -16,24 +16,30 @@ export const authMiddleware = asyncHandler(async (req, res, next) => {
     return res.status(400).json(new ApiResponse(false, null, "BAD_REQUEST"));
   }
 
-  const decodedToken: any = jwt.verify(token!, config.JWT_SECRET!);
+  try {
+    const decodedToken: any = jwt.verify(token!, config.JWT_SECRET!);
 
-  if (!decodedToken) {
+    if (!decodedToken) {
+      return res
+        .status(401)
+        .json(new ApiResponse(false, null, "INVALID_ACCESS_TOKEN"));
+    }
+
+    const { id, name, role } = decodedToken;
+    if ([id, name, role].some((field) => !field)) {
+      return res.status(401).json(new ApiResponse(false, null, "UNAUTHORIZED"));
+    }
+
+    req.user = {
+      id: id,
+      name: name,
+      role: role,
+    };
+
+    next();
+  } catch (error) {
     return res
       .status(401)
       .json(new ApiResponse(false, null, "INVALID_ACCESS_TOKEN"));
   }
-
-  const { id, name, role } = decodedToken;
-  if ([id, name, role].some((field) => !field)) {
-    return res.status(401).json(new ApiResponse(false, null, "UNAUTHORIZED"));
-  }
-
-  req.user = {
-    id: id,
-    name: name,
-    role: role,
-  };
-
-  next();
 });

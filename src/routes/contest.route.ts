@@ -4,13 +4,16 @@ import { authMiddleware } from "../middleware/auth.middleware";
 import { allowedRoles } from "../middleware/role.middleware";
 import {
   createContestSchema,
+  createDsaSchema,
   createMcqSchema,
   submitMcqSchema,
 } from "../schemas/contest.schema";
 import {
+  // addDsaProblem,
   addMcqToContest,
   createContest,
   getContest,
+  getContestLeaderboard,
   submitMcqAnswer,
 } from "../controllers/contest.controller";
 
@@ -40,5 +43,15 @@ router.post(
   validateData(submitMcqSchema),
   submitMcqAnswer,
 );
+
+router.post(
+  ":contestId/dsa",
+  authMiddleware,
+  allowedRoles(["creator"]),
+  validateData(createDsaSchema),
+  // addDsaProblem,
+);
+
+router.get("/:contestId/leaderboard", authMiddleware, getContestLeaderboard);
 
 export default router;

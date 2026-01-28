@@ -3,7 +3,7 @@ import { sql } from "../db";
 import { ApiResponse } from "../utils/ApiResponse";
 import { asyncHandler } from "../utils/asyncHandler";
 
-export const createContest = asyncHandler(async (req, res, next) => {
+export const createContest = asyncHandler(async (req, res) => {
   const { title, description, startTime, endTime } = req.body;
 
   const insertedContest = await sql`
@@ -13,101 +13,115 @@ export const createContest = asyncHandler(async (req, res, next) => {
 `;
 
   if (!insertedContest.length || insertedContest.length === 0) {
-    return res.status(500).json(new ApiResponse(false, {}, "SERVER_ERROR"));
+    return res.status(500).json(new ApiResponse(false, null, "SERVER_ERROR"));
   }
 
   const contest = insertedContest[0];
   if (!contest) {
-    return res.status(500).json(new ApiResponse(false, {}, "SERVER_ERROR"));
+    return res.status(500).json(new ApiResponse(false, null, "SERVER_ERROR"));
   }
   return res.status(201).json(new ApiResponse(true, contest, null));
 });
 
-export const getContest = asyncHandler(async (req, res, next) => {
+export const getContest = asyncHandler(async (req, res) => {
   const contestId = req.params.contestId;
+  if (!contestId) {
+    return res
+      .status(404)
+      .json(new ApiResponse(false, null, "Contest not found"));
+  }
 
   const isContestee = req.user?.role === "contestee";
 
-  const result = await sql`
-  SELECT
-    c.id,
-    c.title,
-    c.description,
-    c.start_time AS "startTime",
-    c.end_time AS "endTime",
-    c.creator_id AS "creatorId",
+  // const result = await sql`
+  //   SELECT
+  //     c.id,
+  //     c.title,
+  //     c.description,
+  //     c.start_time AS "startTime",
+  //     c.end_time AS "endTime",
+  //     c.creator_id AS "creatorId",
 
-    COALESCE(
-      json_agg(
-        DISTINCT (
-          CASE
-            WHEN ${isContestee} THEN
-              jsonb_build_object(
-                'id', m.id,
-                'questionText', m.question_text,
-                'options', m.options,
-                'points', m.points
-              )
-            ELSE
-              jsonb_build_object(
-                'id', m.id,
-                'questionText', m.question_text,
-                'options', m.options,
-                'points', m.points,
-                'correctOptionIndex', m.correct_option_index
-              )
-          END
-        )
-      ) FILTER (WHERE m.id IS NOT NULL),
-      '[]'
-    ) AS mcqs,
+  //     COALESCE(
+  //       json_agg(
+  //         DISTINCT (
+  //           CASE
+  //             WHEN ${isContestee} THEN
+  //               jsonb_build_object(
+  //                 'id', m.id,
+  //                 'questionText', m.question_text,
+  //                 'options', m.options,
+  //                 'points', m.points
+  //               )
+  //             ELSE
+  //               jsonb_build_object(
+  //                 'id', m.id,
+  //                 'questionText', m.question_text,
+  //                 'options', m.options,
+  //                 'points', m.points,
+  //                 'correctOptionIndex', m.correct_option_index
+  //               )
+  //           END
+  //         )
+  //       ) FILTER (WHERE m.id IS NOT NULL),
+  //       '[]'
+  //     ) AS mcqs,
 
-    COALESCE(
-      json_agg(
-        DISTINCT jsonb_build_object(
-          'id', d.id,
-          'title', d.title,
-          'description', d.description,
-          'tags', d.tags,
-          'points', d.points,
-          'timeLimit', d.time_limit,
-          'memoryLimit', d.memory_limit
-        )
-      ) FILTER (WHERE d.id IS NOT NULL),
-      '[]'
-    ) AS "dsaProblems"
+  //     COALESCE(
+  //       json_agg(
+  //         DISTINCT jsonb_build_object(
+  //           'id', d.id,
+  //           'title', d.title,
+  //           'description', d.description,
+  //           'tags', d.tags,
+  //           'points', d.points,
+  //           'timeLimit', d.time_limit,
+  //           'memoryLimit', d.memory_limit
+  //         )
+  //       ) FILTER (WHERE d.id IS NOT NULL),
+  //       '[]'
+  //     ) AS "dsaProblems"
 
-  FROM contests c
-  LEFT JOIN mcq_questions m ON m.contest_id = c.id
-  LEFT JOIN dsa_problems d ON d.contest_id = c.id
-  WHERE c.id = ${contestId}
-  GROUP BY c.id;
-`;
+  //   FROM contests c
+  //   LEFT JOIN mcq_questions m ON m.contest_id = c.id
+  //   LEFT JOIN dsa_problems d ON d.contest_id = c.id
+  //   WHERE c.id = ${contestId}
+  //   GROUP BY c.id;
+  // `;
 
-  const contest = result[0];
+  const data = await Promise.all([
+    sql`select * from contests c
+    where c.id=${contestId}`,
+    sql`select * from mcq_questions where contest_id=${contestId}`,
+    sql`select * from dsa_problems where contest_id=${contestId}`,
+  ]);
 
-  if (!contest) {
+  if (!data[0] || !data[1] || !data[2]) {
     return res
-      .status(500)
-      .json(new ApiResponse(false, {}, "CONTEST_NOT_FOUND"));
+      .status(404)
+      .json(new ApiResponse(false, null, "Contest not found"));
   }
-  return res.status(201).json(new ApiResponse(true, contest, null));
+
+  const mcqs = isContestee
+    ? data[1].map(({ correct_option_index, ...rest }) => rest)
+    : data[1];
+
+  return res.status(200).json(
+    new ApiResponse(
+      true,
+      {
+        ...data[0][0],
+        mcqs,
+        dsaProblems: data[2],
+      },
+      null,
+    ),
+  );
 });
 
-export const addMcqToContest = asyncHandler(async (req, res, next) => {
+export const addMcqToContest = asyncHandler(async (req, res) => {
   const contestId = req.params.contestId;
   const { questionText, options, correctOptionIndex, points } = req.body;
-  const optionsPayloadForSql = `[${options.map((o: string) => `"${o}"`)}]`;
-
-  console.log(
-    "query",
-    `
-    INSERT INTO mcq_questions 
-    (contest_id, question_text, options, correct_option_index, points)
-    VALUES
-    (${contestId}, ${questionText}, ${optionsPayloadForSql}, ${correctOptionIndex}, ${points})
-  `,
-  );
 
   const contest = await sql`
     SELECT * FROM contests WHERE id = ${contestId}
@@ -116,14 +130,14 @@ export const addMcqToContest = asyncHandler(async (req, res, next) => {
   if (!contest.length || contest.length === 0 || !contest[0]) {
     return res
       .status(500)
-      .json(new ApiResponse(false, {}, "CONTEST_NOT_FOUND"));
+      .json(new ApiResponse(false, null, "CONTEST_NOT_FOUND"));
   }
 
   const result = await sql`
     INSERT INTO mcq_questions 
     (contest_id, question_text, options, correct_option_index, points)
     VALUES
-    (${contestId}, ${questionText}, ${optionsPayloadForSql}, ${correctOptionIndex}, ${points})
+    (${contestId}, ${questionText}, ${JSON.stringify(options)}, ${correctOptionIndex}, ${points})
     RETURNING *
   `;
 
@@ -147,17 +161,10 @@ export const addMcqToContest = asyncHandler(async (req, res, next) => {
   );
 });
 
+// TODO: use join to optimise
 export const submitMcqAnswer = asyncHandler(async (req, res) => {
   const { contestId, questionId } = req.params;
   const { selectedOptionIndex } = req.body;
-  console.log(
-    "contestId",
-    contestId,
-    "questionId",
-    questionId,
-    "selected",
-    selectedOptionIndex,
-  );
 
   const contest = await sql`
     SELECT * FROM contests WHERE id=${contestId};
@@ -169,8 +176,6 @@ export const submitMcqAnswer = asyncHandler(async (req, res) => {
       .json(new ApiResponse(false, null, "CONTEST_NOT_FOUND"));
   }
 
-  console.log("contest fetched", contest);
-
   const question = await sql`
     SELECT * FROM mcq_questions WHERE id=${questionId};
   `;
@@ -180,7 +185,6 @@ export const submitMcqAnswer = asyncHandler(async (req, res) => {
       .status(404)
       .json(new ApiResponse(false, null, "QUESTION_NOT_FOUND"));
   }
-  console.log("question fetched", question);
 
   const submittingTime = new Date();
   const contestEndTime = new Date(contest[0].end_time);
@@ -203,7 +207,6 @@ export const submitMcqAnswer = asyncHandler(async (req, res) => {
 
   const isCorrect = question[0].correct_option_index === selectedOptionIndex;
   const pointsEarned = isCorrect ? question[0].points : 0;
-  console.log("isCorrect", isCorrect, "pointsEarned", pointsEarned);
 
   const result = await sql`
     INSERT INTO mcq_submissions 
@@ -219,9 +222,44 @@ export const submitMcqAnswer = asyncHandler(async (req, res) => {
       .status(StatusCodes.INTERNAL_SERVER_ERROR)
       .json(new ApiResponse(false, null, "SERVER_ERROR"));
   }
-  console.log("mcqSubmission", mcqSubmission);
 
   return res
     .status(StatusCodes.CREATED)
     .json(new ApiResponse(true, { isCorrect, pointsEarned }, null));
 });
+
+// export const addDsaProblem = asyncHandler(async (req, res) => {
+//   const contestId = req.params.contestId;
+//   const {
+//     title,
+//     description,
+//     tags,
+//     points,
+//     timeLimit,
+//     memoryLimit,
+//     testCases,
+//   } = req.body;
+
+//   try{
+
+//     const result = await sql.transaction([
+
+//     ])
+
+//   } catch(error: any) {
+
+//   }
+
+//   return res.status(StatusCodes.CREATED).json(
+//     new ApiResponse(
+//       true,
+//       {
+//         id: dsaProblem.id,
+//         contestId,
+//       },
+//       null,
+//     ),
+//   );
+// });
+
+export const getContestLeaderboard = asyncHandler(async (req, res) => {});
