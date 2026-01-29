@@ -240,8 +240,6 @@ export const addDsaProblem = asyncHandler(async (req, res) => {
     testCases,
   } = req.body;
 
-  console.log(testCases);
-
   // CTE
   const [result] = await sql.transaction([
     sql`
