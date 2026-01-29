@@ -5,9 +5,19 @@ import {
   getDsaProblemDetails,
   submitDsaAnswer,
 } from "../controllers/problem.controller";
+import { validateData } from "../middleware/validation.middleware";
+import { problemSubmitSchema } from "../schemas/problem.schema";
 
 const router = Router();
 
 router.get("/:problemId", authMiddleware, getDsaProblemDetails);
 
-router.post("/:problemId/submit", authMiddleware, submitDsaAnswer);
+router.post(
+  "/:problemId/submit",
+  authMiddleware,
+  allowedRoles(["contestee"]),
+  validateData(problemSubmitSchema),
+  submitDsaAnswer,
+);
+
+export default router;

@@ -228,38 +228,76 @@ export const submitMcqAnswer = asyncHandler(async (req, res) => {
     .json(new ApiResponse(true, { isCorrect, pointsEarned }, null));
 });
 
-// export const addDsaProblem = asyncHandler(async (req, res) => {
-//   const contestId = req.params.contestId;
-//   const {
-//     title,
-//     description,
-//     tags,
-//     points,
-//     timeLimit,
-//     memoryLimit,
-//     testCases,
-//   } = req.body;
+export const addDsaProblem = asyncHandler(async (req, res) => {
+  const contestId = req.params.contestId;
+  const {
+    title,
+    description,
+    tags,
+    points,
+    timeLimit,
+    memoryLimit,
+    testCases,
+  } = req.body;
 
-//   try{
+  console.log(testCases);
 
-//     const result = await sql.transaction([
+  // CTE
+  const [result] = await sql.transaction([
+    sql`
+        WITH contest_check AS (
+          SELECT id FROM contests WHERE id = ${contestId}
+        ),
+        inserted_problem AS (
+          INSERT INTO dsa_problems
+            (contest_id, title, description, tags, points, time_limit, memory_limit)
+          SELECT
+            ${contestId},
+            ${title},
+            ${description},
+            ${JSON.stringify(tags)},
+            ${points},
+            ${timeLimit},
+            ${memoryLimit}
+          FROM contest_check
+          RETURNING id
+        ),
+        inserted_test_cases AS (
+          INSERT INTO test_cases
+            (problem_id, input, expected_output, is_hidden)
+          SELECT
+            ip.id,
+            tc.input,
+            tc."expectedOutput",
+            tc."isHidden"
+          FROM inserted_problem ip,
+          jsonb_to_recordset(${JSON.stringify(testCases)}::jsonb)
+            AS tc(input text, "expectedOutput" text, "isHidden" boolean)
+          RETURNING id
+        )
+        SELECT
+          (SELECT id FROM inserted_problem) AS problem_id,
+          COUNT(*) AS test_case_count
+        FROM inserted_test_cases;
+      `,
+  ]);
 
-//     ])
+  if (!result || !result[0]?.problem_id) {
+    return res
+      .status(StatusCodes.NOT_FOUND)
+      .json(new ApiResponse(false, null, "CONTEST_NOT_FOUND"));
+  }
 
-//   } catch(error: any) {
-
-//   }
-
-//   return res.status(StatusCodes.CREATED).json(
-//     new ApiResponse(
-//       true,
-//       {
-//         id: dsaProblem.id,
-//         contestId,
-//       },
-//       null,
-//     ),
-//   );
-// });
+  return res.status(StatusCodes.CREATED).json(
+    new ApiResponse(
+      true,
+      {
+        id: result[0].problem_id,
+        contestId,
+      },
+      null,
+    ),
+  );
+});
 
 export const getContestLeaderboard = asyncHandler(async (req, res) => {});

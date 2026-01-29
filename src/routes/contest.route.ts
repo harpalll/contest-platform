@@ -9,7 +9,7 @@ import {
   submitMcqSchema,
 } from "../schemas/contest.schema";
 import {
-  // addDsaProblem,
+  addDsaProblem,
   addMcqToContest,
   createContest,
   getContest,
@@ -45,11 +45,11 @@ router.post(
 );
 
 router.post(
-  ":contestId/dsa",
+  "/:contestId/dsa",
   authMiddleware,
   allowedRoles(["creator"]),
   validateData(createDsaSchema),
-  // addDsaProblem,
+  addDsaProblem,
 );
 
 router.get("/:contestId/leaderboard", authMiddleware, getContestLeaderboard);
