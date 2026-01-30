@@ -298,4 +298,119 @@ export const addDsaProblem = asyncHandler(async (req, res) => {
   );
 });
 
-export const getContestLeaderboard = asyncHandler(async (req, res) => {});
+// export const getContestLeaderboard = asyncHandler(async (req, res) => {
+//   const { contestId } = req.params;
+
+//   const contest = await sql`
+//     SELECT id FROM contests WHERE id=${contestId};
+//   `;
+
+//   if (!contest.length || contest.length === 0 || !contest[0]) {
+//     return res
+//       .status(404)
+//       .json(new ApiResponse(false, null, "CONTEST_NOT_FOUND"));
+//   }
+
+//   // MCQ
+//   const mcqQuestionsByContests = await sql`
+//     SELECT id FROM mcq_questions
+//     WHERE contest_id = ${contestId}
+//   `;
+
+//   const questionIds = mcqQuestionsByContests.map((question) =>
+//     Number(question.id),
+//   );
+//   const mcqSubmissionByUser = await sql`
+//     SELECT user_id, SUM(points_earned) FROM mcq_submissions
+//     WHERE question_id = ANY(${questionIds})
+//     GROUP BY user_id
+//   `;
+
+//   // DSA
+//   const dsaProblemsByContests = await sql`
+//     SELECT id FROM dsa_problems
+//     WHERE contest_id = ${contestId}
+//   `;
+
+//   const dsaIds = dsaProblemsByContests.map((problem) => Number(problem.id));
+//   const dsaSubmissionByUser = await sql`
+//     SELECT user_id, MAX(points_earned) FROM dsa_submissions
+//     WHERE problem_id = ANY(${dsaIds})
+//     GROUP BY user_id
+//   `;
+
+//   const leaderboardData: LeaderboardData[] = [];
+
+//   return res.status(200).json(
+//     new ApiResponse(
+//       true,
+//       {
+//         mcqData: mcqSubmissionByUser,
+//         dsaData: dsaSubmissionByUser,
+//       },
+//       null,
+//     ),
+//   );
+// });
+
+export const getContestLeaderboard = asyncHandler(async (req, res) => {
+  const { contestId } = req.params;
+
+  const contest = await sql`
+    SELECT id FROM contests WHERE id = ${contestId};
+  `;
+
+  if (!contest.length) {
+    return res
+      .status(404)
+      .json(new ApiResponse(false, null, "CONTEST_NOT_FOUND"));
+  }
+
+  const leaderboard = await sql`
+    WITH mcq_scores AS (
+      SELECT
+        s.user_id,
+        SUM(s.points_earned) AS mcq_points
+      FROM mcq_submissions s
+      JOIN mcq_questions q ON q.id = s.question_id
+      WHERE q.contest_id = ${contestId}
+      GROUP BY s.user_id
+    ),
+    dsa_best_per_problem AS (
+      SELECT
+        user_id,
+        problem_id,
+        MAX(points_earned) AS best_points
+      FROM dsa_submissions
+      GROUP BY user_id, problem_id
+    ),
+    dsa_scores AS (
+      SELECT
+        db.user_id,
+        SUM(db.best_points) AS dsa_points
+      FROM dsa_best_per_problem db
+      JOIN dsa_problems p ON p.id = db.problem_id
+      WHERE p.contest_id = ${contestId}
+      GROUP BY db.user_id
+    ),
+    total_scores AS (
+      SELECT
+        u.id AS user_id,
+        u.name,
+        COALESCE(m.mcq_points, 0) + COALESCE(d.dsa_points, 0) AS total_points
+      FROM users u
+      LEFT JOIN mcq_scores m ON m.user_id = u.id
+      LEFT JOIN dsa_scores d ON d.user_id = u.id
+    )
+    SELECT
+      user_id AS "userId",
+      name,
+      total_points AS "totalPoints",
+      DENSE_RANK() OVER (ORDER BY total_points DESC) AS rank
+    FROM total_scores
+    WHERE total_points > 0
+    ORDER BY rank, name;
+  `;
+
+  return res.status(200).json(new ApiResponse(true, leaderboard, null));
+});
