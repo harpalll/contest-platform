@@ -23,6 +23,14 @@ export const createContest = asyncHandler(async (req, res) => {
   return res.status(201).json(new ApiResponse(true, contest, null));
 });
 
+export const getAllContests = asyncHandler(async (req, res) => {
+  const contests = await sql`
+    SELECT * FROM contests ORDER BY start_time DESC;
+  `;
+
+  return res.status(200).json(new ApiResponse(true, contests, null));
+});
+
 export const getContest = asyncHandler(async (req, res) => {
   const contestId = req.params.contestId;
   if (!contestId) {
@@ -106,6 +114,17 @@ export const getContest = asyncHandler(async (req, res) => {
     ? data[1].map(({ correct_option_index, ...rest }) => rest)
     : data[1];
 
+  let mcqSubmissions: any[] = [];
+  if (isContestee && req.user?.id) {
+    mcqSubmissions = await sql`
+      SELECT question_id, selected_option_index, is_correct, points_earned
+      FROM mcq_submissions
+      WHERE user_id=${req.user.id} AND question_id IN (
+        SELECT id FROM mcq_questions WHERE contest_id=${contestId}
+      )
+    `;
+  }
+
   return res.status(200).json(
     new ApiResponse(
       true,
@@ -113,6 +132,7 @@ export const getContest = asyncHandler(async (req, res) => {
         ...data[0][0],
         mcqs,
         dsaProblems: data[2],
+        mcqSubmissions
       },
       null,
     ),

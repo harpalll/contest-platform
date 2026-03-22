@@ -12,6 +12,7 @@ import {
   addDsaProblem,
   addMcqToContest,
   createContest,
+  getAllContests,
   getContest,
   getContestLeaderboard,
   submitMcqAnswer,
@@ -25,6 +26,8 @@ router.post(
   validateData(createContestSchema),
   createContest,
 );
+
+router.get("/", authMiddleware, getAllContests);
 
 router.get("/:contestId", authMiddleware, getContest);
 
