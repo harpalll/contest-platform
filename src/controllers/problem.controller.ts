@@ -9,6 +9,7 @@ export const getDsaProblemDetails = asyncHandler(async (req, res) => {
   const data = await Promise.all([
     sql`select * from dsa_problems where id=${problemId}`,
     sql`select * from test_cases where problem_id=${problemId} and is_hidden=false`,
+    sql`SELECT status, points_earned as "pointsEarned", test_cases_passed as "testCasesPassed", total_test_cases as "totalTestCases" FROM dsa_submissions WHERE problem_id=${problemId} AND user_id=${req.user?.id}`
   ]);
 
   if (data[0].length === 0 || data[1].length === 0) {
@@ -17,10 +18,12 @@ export const getDsaProblemDetails = asyncHandler(async (req, res) => {
       .json(new ApiResponse(false, null, "PROBLEM_NOT_FOUND"));
   }
 
+  const submission = data[2].length > 0 ? data[2][0] : null;
+
   return res
     .status(200)
     .json(
-      new ApiResponse(true, { ...data[0][0], visibleTestCases: data[1] }, null),
+      new ApiResponse(true, { ...data[0][0], visibleTestCases: data[1], submission }, null),
     );
 });
 
@@ -52,6 +55,17 @@ export const submitDsaAnswer = asyncHandler(async (req, res) => {
     return res
       .status(400)
       .json(new ApiResponse(false, null, "CONTEST_NOT_ACTIVE"));
+  }
+
+  const alreadySubmitted = await sql`
+    SELECT id FROM dsa_submissions 
+    WHERE problem_id=${problemId} AND user_id=${req.user?.id};
+  `;
+
+  if (alreadySubmitted.length > 0) {
+    return res
+      .status(400)
+      .json(new ApiResponse(false, null, "ALREADY_SUBMITTED"));
   }
 
   const testCases = await sql`

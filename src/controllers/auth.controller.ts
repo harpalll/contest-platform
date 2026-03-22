@@ -90,7 +90,7 @@ export const login = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(true, { token: accessToken }, null));
+    .json(new ApiResponse(true, { user: payload, token: accessToken }, null));
 });
 
 export const me = asyncHandler(async (req, res) => {
